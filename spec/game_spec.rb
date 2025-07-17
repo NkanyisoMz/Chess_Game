@@ -62,4 +62,11 @@ RSpec.describe Game do
       expect(loaded_game).to be_a(Game)
     end
   end
+
+  describe '#play' do
+  it 'handles invalid moves gracefully' do
+    allow(white_player).to receive(:get_move).and_return([[6, 4], [3, 4]]) # Invalid pawn move
+    expect { game.play }.to output(/Invalid move/).to_stdout
+  end
+end
 end
