@@ -14,10 +14,14 @@ class Game
   def play
     loop do
       display_board
-      move = current_player.get_move
-      handle_move(move)
+      begin
+        move = current_player.get_move
+        handle_move(move)
+      rescue StandardError => e
+        puts "Error: #{e.message}. Try again."
+        next
+      end
       break if board.checkmate?(current_player.color)
-
       switch_turn
     end
     puts "#{current_player.color.capitalize} wins! Checkmate!"
@@ -41,9 +45,9 @@ class Game
 
   def handle_move(move)
     start_pos, end_pos = move
+    raise "Invalid input format" unless start_pos && end_pos
     board.move_piece(start_pos, end_pos, current_player.color)
   end
-  
 
   def switch_turn
     @current_player = (@current_player == @players[:white]) ? @players[:black] : @players[:white]
