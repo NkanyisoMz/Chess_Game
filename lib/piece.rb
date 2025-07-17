@@ -29,9 +29,20 @@ class Piece
 
   # Method to check if the piece is currently pinned (cannot move without exposing its king to check)
   def pinned?(board)
-    # Logic to check if moving this piece would leave the king in check
-    # This would involve simulating the move, checking if the king is in check, and then reversing the move
-    false
+    # Find the king of the same color
+    king_pos = board.find_king(color)
+    current_pos = position
+
+    # Temporarily remove this piece
+    board.grid[position[0]][position[1]] = nil
+
+    # Check if the king is in check without this piece
+    in_check = board.in_check?(color)
+
+    # Restore the piece
+    board.grid[position[0]][position[1]] = self
+
+    in_check
   end
 
   # Method to calculate directional moves, used for pieces like Rook, Bishop, and Queen
