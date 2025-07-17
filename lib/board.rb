@@ -6,19 +6,14 @@ class Board
   def initialize
     # Initialize an 8x8 grid, where each element is either a piece or nil
     @grid = Array.new(8) { Array.new(8, nil) }
-
-    # Add pieces to their starting positions
     setup_pieces
   end
 
   def setup_pieces
-    # Place pawns
     (0..7).each do |i|
       @grid[1][i] = Pawn.new('black', [1, i]) # Black pawns
       @grid[6][i] = Pawn.new('white', [6, i]) # White pawns
     end
-
-    # Place back row pieces
     setup_back_row(0, 'black') # Black back row
     setup_back_row(7, 'white') # White back row
   end
@@ -35,103 +30,104 @@ class Board
   end
 
   def get_piece_at(position)
+    return nil unless position && position.length == 2
     x, y = position
-    return nil if x.nil? || y.nil? || x < 0 || x > 7 || y < 0 || y > 7 # Ensure valid grid position
-    @grid[x][y] # Access the piece at position
+    return nil if x.nil? || y.nil? || x < 0 || x > 7 || y < 0 || y > 7
+    @grid[x][y]
   end
 
   def move_piece(from_pos, to_pos, current_player_color)
     piece = get_piece_at(from_pos)
-  
-    if piece.nil?
-      puts "No piece found at #{from_pos}. Invalid move."
-      return
+    unless piece
+      raise "No piece found at #{from_pos}. Invalid move."
     end
-  
-    if piece.color != current_player_color
-      puts "You cannot move the opponent's piece!"
-      return
+
+    unless piece.color == current_player_color
+      raise "You cannot move the opponent's piece!"
     end
-  
+
+    unless piece.valid_moves(self).include?(to_pos)
+      raise "Invalid move for #{piece.class} from #{from_pos} to #{to_pos}."
+    end
+
+    # Check if the move puts the player's own king in check
+    if move_causes_check?(from_pos, to_pos, current_player_color)
+      raise "Move would place your king in check!"
+    end
+
+    # Perform the move
     x, y = to_pos
-    # Move the piece to the new position
     @grid[x][y] = piece
-    @grid[from_pos[0]][from_pos[1]] = nil # Clear the original position
-    piece.position = to_pos # Update the piece's position
+    @grid[from_pos[0]][from_pos[1]] = nil
+    piece.position = to_pos
   end
 
-  # In Board class
-def checkmate?(color)
-  return false unless in_check?(color)
+  def checkmate?(color)
+    return false unless in_check?(color)
 
-  # Iterate through all pieces of the current player
-  @grid.each_with_index do |row, row_index|
-    row.each_with_index do |piece, col_index|
-      next if piece.nil? || piece.color != color
+    @grid.each_with_index do |row, row_index|
+      row.each_with_index do |piece, col_index|
+        next if piece.nil? || piece.color != color
 
-      # Get all possible moves for this piece
-      piece_possible_moves = piece.possible_moves
-
-      # Simulate each move to see if it can remove the check
-      piece_possible_moves.each do |move|
-        from_pos = [row_index, col_index]
-        to_pos = move
-
-        if move_removes_check?(from_pos, to_pos, color)
-          return false # If a valid move is found, it's not checkmate
+        piece.valid_moves(self).each do |move|
+          from_pos = [row_index, col_index]
+          return false if move_removes_check?(from_pos, move, color)
         end
       end
     end
+    true
   end
 
-  true # If no valid moves found, it is checkmate
-end
+  def in_check?(color)
+    king_pos = find_king(color)
 
-def in_check?(color)
-  # Find the king
-  king_pos = find_king(color)
-
-  # Check if any opposing piece can attack the king
-  @grid.each do |row|
-    row.each do |piece|
-      next if piece.nil? || piece.color == color
-
-      return true if piece.possible_moves.include?(king_pos)
+    @grid.each do |row|
+      row.each do |piece|
+        next if piece.nil? || piece.color == color
+        return true if piece.valid_moves(self).include?(king_pos)
+      end
     end
+    false
   end
 
-  false
-end
-
-def find_king(color)
-  @grid.each_with_index do |row, row_index|
-    row.each_with_index do |piece, col_index|
-      return [row_index, col_index] if piece.is_a?(King) && piece.color == color
+  def find_king(color)
+    @grid.each_with_index do |row, row_index|
+      row.each_with_index do |piece, col_index|
+        return [row_index, col_index] if piece.is_a?(King) && piece.color == color
+      end
     end
+    raise "King not found for color #{color}"
   end
 
-  raise "King not found for color #{color}" # King should always exist
-end
+  def move_removes_check?(from_pos, to_pos, color)
+    original_piece = @grid[to_pos[0]][to_pos[1]]
+    piece = @grid[from_pos[0]][from_pos[1]]
+    @grid[to_pos[0]][to_pos[1]] = piece
+    @grid[from_pos[0]][from_pos[1]] = nil
+    piece.position = to_pos
 
-# Simulate the move and check if it removes the check
-def move_removes_check?(from_pos, to_pos, color)
-  # Temporarily move the piece
-  original_piece = @grid[to_pos[0]][to_pos[1]]
-  piece = @grid[from_pos[0]][from_pos[1]]
-  @grid[to_pos[0]][to_pos[1]] = piece
-  @grid[from_pos[0]][from_pos[1]] = nil
-  piece.position = to_pos
+    still_in_check = in_check?(color)
 
-  # Check if the king is still in check after the move
-  still_in_check = in_check?(color)
+    @grid[from_pos[0]][from_pos[1]] = piece
+    @grid[to_pos[0]][to_pos[1]] = original_piece
+    piece.position = from_pos
 
-  # Revert the move
-  @grid[from_pos[0]][from_pos[1]] = piece
-  @grid[to_pos[0]][to_pos[1]] = original_piece
-  piece.position = from_pos
+    !still_in_check
+  end
 
-  !still_in_check
-end
+  def move_causes_check?(from_pos, to_pos, color)
+    original_piece = @grid[to_pos[0]][to_pos[1]]
+    piece = @grid[from_pos[0]][from_pos[1]]
+    @grid[to_pos[0]][to_pos[1]] = piece
+    @grid[from_pos[0]][from_pos[1]] = nil
+    piece.position = to_pos
 
-  
+    in_check = in_check?(color)
+
+    @grid[from_pos[0]][from_pos[1]] = piece
+    @grid[to_pos[0]][to_pos[1]] = original_piece
+    piece.position = from_pos
+
+    in_check
+  end
 end
